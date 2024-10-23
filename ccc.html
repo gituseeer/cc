@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credit Card Generator & Checker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f4;
+        }
+        .container {
+            text-align: center;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            width: 400px;
+        }
+        input {
+            padding: 10px;
+            width: 100%;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 1.2rem;
+        }
+        .valid {
+            color: green;
+        }
+        .invalid {
+            color: red;
+        }
+        .detail {
+            margin-top: 15px;
+            text-align: left;
+        }
+        .detail p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>CC Generator & Checker</h1>
+        <select id="cardType">
+            <option value="visa">Visa</option>
+            <option value="mastercard">MasterCard</option>
+            <option value="amex">American Express</option>
+            <option value="unionpay">UnionPay</option>
+        </select>
+        <input type="text" id="ccNumber" placeholder="Enter or Generate CC" maxlength="19"/>
+        <button onclick="generateCard()">Generate Card</button>
+        <button onclick="checkCard()">Check Card</button>
+        <div id="status">
+            <p>Card details will appear here.</p>
+        </div>
+        <div id="details" class="detail"></div>
+    </div>
+
+    <script>
+        // Luhn Algorithm for card validation
+        function luhnAlgorithm(digits) {
+            let sum = 0;
+            let shouldDouble = false;
+
+            for (let i = digits.length - 1; i >= 0; i--) {
+                let digit = parseInt(digits[i]);
+
+                if (shouldDouble) {
+                    digit *= 2;
+                    if (digit > 9) digit -= 9;
+                }
+
+                sum += digit;
+                shouldDouble = !shouldDouble;
+            }
+
+            return sum % 10 === 0;
+        }
+
+        // Detect card type and other details based on the number
+        function getCardDetails(number) {
+            const firstDigit = number[0];
+            const firstTwoDigits = number.slice(0, 2);
+            const firstSixDigits = number.slice(0, 6);
+
+            let details = {
+                mii: "Unknown",
+                network: "Unknown",
+                bank: "Unknown",
+                country: "Unknown",
+                bin: firstSixDigits,
+                pan: number.slice(6, number.length - 1),
+                checksum: number.slice(-1)
+            };
+
+            // Determine the Major Industry Identifier (MII) and network
+            if (firstDigit === '4') {
+                details.mii = "Banking and Financial";
+                details.network = "Visa";
+            } else if (firstDigit === '5' && firstTwoDigits >= '51' && firstTwoDigits <= '55') {
+                details.mii = "Banking and Financial";
+                details.network = "MasterCard";
+            } else if (firstDigit === '3' && (firstTwoDigits === '34' || firstTwoDigits === '37')) {
+                details.mii = "Travel and Entertainment";
+                details.network = "American Express";
+            } else if (firstDigit === '6') {
+                details.mii = "Banking and Financial";
+                details.network = "UnionPay";
+            }
+
+            // Example: Bank for MasterCard with BIN 547980
+            if (details.bin === '547980') {
+                details.bank = "Tbi Credit Ead";
+                details.country = "Bulgaria";
+            }
+
+            return details;
+        }
+
+        // Generate a random valid card number (Luhn compliant)
+        function generateCard() {
+            const cardType = document.getElementById("cardType").value;
+            let cardNumber = "";
+            let cvv = "";
+            let numberLength = 0;
+
+            switch (cardType) {
+                case "visa":
+                    cardNumber = "4"; // Visa starts with 4
+                    numberLength = 16;
+                    cvv = generateRandomNumber(3);
+                    break;
+                case "mastercard":
+                    cardNumber = "5" + (Math.floor(Math.random() * 5) + 1); // MasterCard starts with 51-55
+                    numberLength = 16;
+                    cvv = generateRandomNumber(3);
+                    break;
+                case "amex":
+                    cardNumber = "34" + generateRandomNumber(13); // Amex starts with 34 or 37
+                    numberLength = 15;
+                    cvv = generateRandomNumber(4);
+                    break;
+                case "unionpay":
+                    cardNumber = "62"; // UnionPay starts with 62
+                    numberLength = 16;
+                    cvv = generateRandomNumber(3);
+                    break;
+                default:
+                    return;
+            }
+
+            // Generate remaining digits
+            for (let i = cardNumber.length; i < numberLength - 1; i++) {
+                cardNumber += Math.floor(Math.random() * 10);
+            }
+
+            // Calculate checksum
+            const checksum = getLuhnChecksum(cardNumber);
+            cardNumber += checksum;
+
+            // Generate expiration date
+            const expMonth = ("0" + (Math.floor(Math.random() * 12) + 1)).slice(-2);
+            const expYear = (new Date().getFullYear() + Math.floor(Math.random() * 6)).toString().slice(-2);
+
+            document.getElementById('ccNumber').value = cardNumber;
+            document.getElementById('status').innerHTML = `<p class="valid">Generated Card: ${cardNumber}<br>CVV: ${cvv}<br>Exp: ${expMonth}/${expYear}</p>`;
+            document.getElementById('details').innerHTML = "";
+        }
+
+        // Generate random number for CVV, etc.
+        function generateRandomNumber(length) {
+            let number = "";
+            for (let i = 0; i < length; i++) {
+                number += Math.floor(Math.random() * 10);
+            }
+            return number;
+        }
+
+        // Get Luhn checksum
+        function getLuhnChecksum(cardNumber) {
+            let sum = 0;
+            let shouldDouble = true;
+
+            for (let i = cardNumber.length - 1; i >= 0; i--) {
+                let digit = parseInt(cardNumber[i]);
+
+                if (shouldDouble) {
+                    digit *= 2;
+                    if (digit > 9) digit -= 9;
+                }
+
+                sum += digit;
+                shouldDouble = !shouldDouble;
+            }
+
+            return (sum * 9) % 10;
+        }
+
+        function checkCard() {
+            const cardNumber = document.getElementById('ccNumber').value.trim().replace(/\s+/g, '');
+
+            if (cardNumber.length < 13 || cardNumber.length > 19) {
+                document.getElementById('status').innerHTML = '<p class="invalid">Invalid card number length.</p>';
+                return;
+            }
+
+            const isValid = luhnAlgorithm(cardNumber);
+            const details = getCardDetails(cardNumber);
+
+            // Display the result
+            if (isValid) {
+                document.getElementById('status').innerHTML = '<p class="valid">Luhn Algorithm Check: Passed</p>';
+            } else {
+                document.getElementById('status').innerHTML = '<p class="invalid">Luhn Algorithm Check: Failed</p>';
+            }
+
+            // Display detailed card information
+            document.getElementById('details').innerHTML = `
+                <p><strong>MII (Major Industry Identifier):</strong> ${details.mii}</p>
+                <p><strong>Network/Brand:</strong> ${details.network}</p>
+                <p><strong>Bank Name:</strong> ${details.bank}</p>
+                <p><strong>Bank Country:</strong> ${details.country}</p>
+                <p><strong>BIN/IIN (First 6 digits):</strong> ${details.bin}</p>
+                <p><strong>PAN (Personal Account Number):</strong> ${details.pan}</p>
+                <p><strong>Checksum (Last digit):</strong> ${details.checksum}</p>
+            `;
+        }
+    </script>
+
+</body>
+</html>
